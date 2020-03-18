@@ -741,8 +741,8 @@ int main (void)
 
             case DONE:
                 //We're done. Let's do some work
-                //Let's sleep for a millisecond to allow the pi to be ready to receive
-                _delay_ms(1);
+                //Let's sleep for a while to allow the pi to be ready to receive
+                _delay_ms(50);
                 processCommand();
                 //Get ready for the next command
                 dataByte = 0;
