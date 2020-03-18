@@ -88,7 +88,7 @@ static uint8_t    pkt_bufSend[PKT_MAX_PLEN+2];
 static uint8_t    dataByte = 0;
 static uint8_t    packet_sequence = 0;
 static uint8_t    devicesFound = 0;
-//static uint16_t   ADCValue;
+static uint16_t   ADCValue;
 static uint8_t    timerIrqCount = 0;
 
 /* ----------------------- Function prototypes ------------------------------*/
@@ -606,7 +606,7 @@ int main (void)
 #endif
 
 #ifdef DEBUG
-/*
+
   for (uint8_t channel=0; channel<8; channel++)
   {
     uart0_puts("ADC Channel: ");
@@ -627,7 +627,7 @@ int main (void)
       _delay_ms(200);
     }
 }
-*/
+
 #endif
 
 #ifdef DEBUG
@@ -974,7 +974,7 @@ uint8_t processPacket(unsigned int c)
     uint8_t result = PROCESSING;
 
 #ifdef DEBUG
-    char buffer[7];
+//    char buffer[7];
 //    itoa( c, buffer, 16);
 //    uart0_puts("ProcessPacket: ");
 //    uart0_puts(buffer);
@@ -1067,12 +1067,13 @@ uint8_t processPacket(unsigned int c)
             pkt_buf_Rcv[PKT_LENGTH + dataByte] = c;
             if (c != pkt_compute_cksum(pkt_buf_Rcv))
             {
+                //Ignore for now.
 //                result = CRC_ERROR;
                 result = DONE;
 #ifdef DEBUG
-                uart0_puts("Checksum BAD \n\r");
-                uart0_puts(itoa(c, buffer, 8));
-                uart0_puts("\n\r");
+//                uart0_puts("Checksum BAD \n\r");
+//                uart0_puts(itoa(c, buffer, 8));
+//                uart0_puts("\n\r");
 #endif
             }
             else
