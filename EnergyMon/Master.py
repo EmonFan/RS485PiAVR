@@ -33,6 +33,7 @@ TRANSMIT_ITEM   = 0xD2
 
 READ_ENABLE = 7
 BUFFER_MAX = 60
+GPIO_DELAY = .1
 
 # to use Raspberry Pi board pin numbers  
 GPIO.setmode(GPIO.BOARD)
@@ -40,9 +41,9 @@ GPIO.setwarnings(False)
 GPIO.setup(READ_ENABLE, GPIO.OUT) 
 
 #Slave is running at DOUBLE SPEED
-#sp = serial.Serial('/dev/ttyAMA0', 230400, timeout = .05)
-#sp = serial.Serial('/dev/ttyAMA0', 115200, timeout = .01)
-sp = serial.Serial('/dev/ttyAMA0', 57600, timeout = .1)
+#sp = serial.Serial('/dev/ttyAMA0', 230400, timeout = .1)
+sp = serial.Serial('/dev/ttyAMA0', 115200, timeout = .02)
+#sp = serial.Serial('/dev/ttyAMA0', 57600, timeout = .02)
 
 #create an unsigned byte array for data reception
 receiveBuffer = array.array('B')
@@ -94,16 +95,14 @@ def checkSum(buffer):
     ckSum += buffer[i]
     i += 1
 
-  #print "CS Raw: " + str(ckSum)
   #our checksum must be a byte
+  #Beware that this can generate what is considered a
+  #negative value and breaks later on.
   multiple = ckSum / 255;
   if (multiple >= 1):
     ckSum = ckSum - (255 * multiple)
     ckSum -= multiple
 
-  if (ckSum < 0):
-    ckSum = 256 + ckSum
-    print "CkSum = " + str(ckSum)
   return ckSum
 
 #Validate a received packet is valid
@@ -127,7 +126,6 @@ def validate(slaveID):
                 return PKTF_SENSOR_BAD
               #So far so good. Let's verify the checksum
               if (receiveBuffer[ packetOffset+PKT_LENGTH + int(receiveBuffer[packetOffset+PKT_LENGTH]) + 1]== checkSum(receiveBuffer)):
-#                print "CS OK"
                 return PKT_VALID
               else:
 #                print "Expected: " + str(receiveBuffer[ packetOffset+PKT_LENGTH + int(receiveBuffer[packetOffset+PKT_LENGTH]) + 1])
@@ -149,8 +147,8 @@ def identifySlaves():
   global packetOffset
   global receiveBuffer
   #Let's call them all individually to see who is alive
-  index = 5
-  while (index < 6):
+  index = 0
+  while (index < 8):
     #Set the slave address we will ping
     slaveID = SLAVE_BASE + index
     
@@ -160,6 +158,7 @@ def identifySlaves():
     #Payload in the request is a single byte just to keep things clean
     #Slaves will respond with their ID's but with random delays to prevent collisions
     transmitBuffer = array.array('B', [PKT_LEADIN_BYTE, PKT_START_BYTE, slaveID, MASTER_ID, PKTF_REQID, 0x01, 0x00])
+    #The following breaks if the checksum is evaluated as a negative value
     #transmitBuffer.append(checkSum(transmitBuffer))
 
     #Enable transmit mode and send the data
@@ -167,15 +166,16 @@ def identifySlaves():
     print 'SlaveID: ' + str(slaveID)
     #print transmitBuffer
     sp.write(transmitBuffer)
-    checkSumBuffer = bytearray(1)
-    checkSumBuffer[0] = checkSum(transmitBuffer)
-    sp.write(checkSumBuffer)
+    #Workaround for the negative checksum byte
+    #checkSumBuffer = bytearray(1)
+    #checkSumBuffer[0] = checkSum(transmitBuffer)
+    #sp.write(checkSumBuffer)
     sp.flush()
 
     #enable receive mode
     GPIO.output(READ_ENABLE, GPIO.LOW)
-    time.sleep(.02)
-    #read up to 60 bytes or timeout. 60 is the max packet length
+    time.sleep(GPIO_DELAY) #allow time for the pin to transition
+    #read up to BUFFER_MAX bytes or timeout. 60 is the max packet length
     response = sp.read(BUFFER_MAX)
 
     #print response.encode('hex')
@@ -208,24 +208,25 @@ def itemCount(slave):
   del receiveBuffer[:]
 
   transmitBuffer = array.array('B', [PKT_LEADIN_BYTE, PKT_START_BYTE,  slave.slaveID, MASTER_ID, PKTF_COMMAND, 0x01, ENUMERATE_COUNT])
+  #breaks due to negative byte
   #transmitBuffer.append(checkSum(transmitBuffer))
 
   #Enable transmit mode and send the data
   GPIO.output(READ_ENABLE, GPIO.HIGH) 
   sp.write(transmitBuffer)
-  checkSumBuffer = bytearray(1)
-  checkSumBuffer[0] = checkSum(transmitBuffer)
-  sp.write(checkSumBuffer)
+  #checkSumBuffer = bytearray(1)
+  #checkSumBuffer[0] = checkSum(transmitBuffer)
+  #sp.write(checkSumBuffer)
   sp.flush()
 
   #enable receive mode
   GPIO.output(READ_ENABLE, GPIO.LOW)
-  time.sleep(.02)
+  time.sleep(GPIO_DELAY) #Allow pin to transition
 
   #read up to 60 bytes or timeout. 60 is the max packet length
   response = sp.read(BUFFER_MAX)
   
-  print "response = " + response.encode('hex')
+  #print "response = " + response.encode('hex')
 
   #the response will be a string, we need a byte array.
   receiveBuffer.fromstring(response)
@@ -263,14 +264,14 @@ def getItemData(slave, command, itemIndex):
   #Enable transmit mode and send the data
   GPIO.output(READ_ENABLE, GPIO.HIGH) 
   sp.write(transmitBuffer)
-  checkSumBuffer = bytearray(1)
-  checkSumBuffer[0] = checkSum(transmitBuffer)
-  sp.write(checkSumBuffer)
+  #checkSumBuffer = bytearray(1)
+  #checkSumBuffer[0] = checkSum(transmitBuffer)
+  #sp.write(checkSumBuffer)
   sp.flush()
 
   #enable receive mode
   GPIO.output(READ_ENABLE, GPIO.LOW)
-  time.sleep(.02)
+  time.sleep(.3)
   #read up to 60 bytes or timeout. 60 is the max packet length
   response = sp.read(BUFFER_MAX)
   
@@ -317,12 +318,15 @@ def slaveSensors(slave):
     #print "Temp: " + str(currentTemp)
     itemIndex += 1
 
-while (len(slaveList) == 0):
-  identifySlaves()  #Get the slaves that exist on the network
-  time.sleep(1)     #We need at least one slave on the network. Try again in a moment
+def inventory():
+  while (len(slaveList) == 0):
+    identifySlaves()  #Get the slaves that exist on the network
+    time.sleep(1)     #We need at least one slave on the network. Try again in a moment
 
-for slave in slaveList:
-  slaveSensors(slave) #Get the sensors that exist on each slave
+  for slave in slaveList:
+    slaveSensors(slave) #Get the sensors that exist on each slave
+
+inventory()
 
 while (1):
   for slave in slaveList:
@@ -340,6 +344,8 @@ while (1):
       except Exception, e:
         #print "Exception with sensor: " + slave.sensorList[itemIndex].sensorID.tostring().encode('hex')
         print str(e)
+        slaveList.clear
+        inventory
         pass
       
       time.sleep(.5)

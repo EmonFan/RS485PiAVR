@@ -22,7 +22,7 @@
 #include "./robin/robin.h"
 
 /* ----------------------- Defines ------------------------------------------*/
-#define USART_BAUDRATE  57600
+#define USART_BAUDRATE  115200
 #define BAUD_PRESCALE   (((F_CPU / (USART_BAUDRATE * 16UL))) - 1)
 
 /* ----------------------- PIN Defines --------------------------------------*/
