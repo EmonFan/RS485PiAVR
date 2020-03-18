@@ -49,27 +49,27 @@ sp = serial.Serial('/dev/ttyAMA0', 115200, timeout = .02)
 receiveBuffer = array.array('B')
 
 #The sensor class represents a single sensor with it's current value
-class sensor:
+class Sensor:
   sensorCount = 0
   
   def __init__(self):
     self.sensorID = array.array('B')
     self.currentValue = ""
-    sensor.sensorCount += 1
+    Sensor.sensorCount += 1
 
   def clear(self):
     print "Delete sensor"
     del self.sensorID
-    sensor.sensorCount -= 1
+    Sensor.sensorCount -= 1
 
 #The slave class represents a network slave along with it's associated sensor list
-class slave:
+class Slave:
   slaveCount = 0
   
   def __init__(self):
     self.slaveID = 0
     self.sensorList = []
-    slave.slaveCount += 1
+    Slave.slaveCount += 1
 
   def clear(self):
     for sensor in self.sensorList:
@@ -184,7 +184,7 @@ def identifySlaves():
     receiveBuffer.fromstring(response)
 
     if (validate(slaveID) == PKT_VALID):
-      newSlave = slave()
+      newSlave = Slave()
       newSlave.slaveID = int(response[packetOffset+PKT_DATA].encode('hex'), 16)
       slaveList.append(newSlave)
       print "Slave ID: " + str(newSlave.slaveID)
@@ -278,7 +278,7 @@ def getItemData(slave, command, itemIndex):
   #the response will be a string, we need a byte array.
   receiveBuffer.fromstring(response)
 
-  newSensor = sensor()
+  newSensor = Sensor()
   result = ""
   validation = validate(slave.slaveID)
   if ( validation == PKTF_SENSOR_BAD): 
@@ -343,9 +343,10 @@ while (1):
           print "Sensor: " + slave.sensorList[itemIndex].sensorID.tostring().encode('hex') + " = " + currentTemp + "C"
       except Exception, e:
         #print "Exception with sensor: " + slave.sensorList[itemIndex].sensorID.tostring().encode('hex')
+        #Clear our sensor list and re-inventory for this particular slave
         print str(e)
-        slaveList.clear
-        inventory
+        slave.clear
+        slaveSensors(slave)
         pass
       
       time.sleep(.5)
